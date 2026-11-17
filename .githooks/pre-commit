@@ -1,0 +1,29 @@
+#!/bin/sh
+# Blocks commits that would add secrets. Enable once per clone:
+#   git config core.hooksPath .githooks
+# Prints file names and key names only, never values.
+fail=0
+
+# 1. Local-only files must never be staged.
+for f in $(git diff --cached --name-only --diff-filter=ACMR); do
+  case "$f" in
+    *.local|.env.local|*.pem|*.key|.npmrc)
+      echo "pre-commit: refusing to commit local/secret file: $f"; fail=1 ;;
+  esac
+done
+
+# 2. Committed .env files may not carry values for ID/secret-like keys
+#    (put those in .env.<mode>.local, CI variables or app-config.js at deploy time).
+for f in $(git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)\.env(\.[a-z]+)?$'); do
+  keys=$(git show ":$f" | grep -E '^[A-Z0-9_]*(ORG|KEY|TOKEN|SECRET|AUTH|PASSWORD)[A-Z0-9_]*=.+' | cut -d= -f1)
+  if [ -n "$keys" ]; then
+    echo "pre-commit: $f sets values for: $keys (move them to $f.local)"; fail=1
+  fi
+done
+
+# 3. Obvious secret patterns anywhere in the staged diff (values not printed).
+if git diff --cached -U0 | grep -E '^\+' | grep -qE '(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|gtm_auth=[A-Za-z0-9_-]{10,}|xox[baprs]-[A-Za-z0-9-]{10,})'; then
+  echo "pre-commit: staged changes contain something that looks like a secret/token"; fail=1
+fi
+
+[ "$fail" -eq 0 ] || { echo "pre-commit: commit blocked"; exit 1; }

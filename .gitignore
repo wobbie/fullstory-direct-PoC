@@ -1,0 +1,21 @@
+# Dependencies and build output
+node_modules
+dist
+
+# Local-only config: real FullStory Org IDs and any other per-developer values live here.
+# Vite loads .env.local and .env.<mode>.local automatically; they must never be committed.
+*.local
+.env.local
+.env.*.local
+
+# Personal Claude Code settings (the shared .claude/settings.json IS committed)
+.claude/settings.local.json
+
+# Credentials that should never be in a repo
+*.pem
+*.key
+.npmrc
+
+# Tooling / OS noise
+.playwright-mcp/
+.DS_Store
